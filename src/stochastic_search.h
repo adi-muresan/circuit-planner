@@ -8,6 +8,9 @@
  * Store wire connections as a 2D matrix of size 151 x 301:
  *
  * - inputs for the same unit are consecutive and start at a multiple of 2
+ * - we do not have a wire for the connection to the output of the array
+ * because we'll just assume a connection is made when one of the arithmetic
+ * units manages to recover the desired function
  *
  * - 3 x 50 + 1 outputs representing the signal source of a wire
  * i.e. 3 unit types, one output each
@@ -39,21 +42,26 @@
 // TODO: revise the above
 typedef std::vector<int> connections_t;
 
-const std::size_t CONN_UNITS_COUNT = 3 * 50 + 1;
-const std::size_t CONN_INPUT_COUNT = 3 * 50 * 2 + 1;
+const std::size_t UNIT_COUNT = 3 * 50;
+const std::size_t CONN_UNIT_COUNT = UNIT_COUNT + 1;
+const std::size_t CONN_INPUT_COUNT = 3 * 50 * 2;
 
 // last element represents the input of the physical array
-const std::size_t ARRAY_INPUT_ID = CONN_UNITS_COUNT - 1;
-
-const std::size_t ARRAY_OUTPUT_ID = CONN_INPUT_COUNT - 1;
+const std::size_t ARRAY_INPUT_ID = UNIT_COUNT - 1;
 
 /* A unit can generate an output, but it does not have to be always valid.
  * Ex: x^2 + x^2 = 2*x^2, which we do not want to propagate further
+ * Ex: x / (x + 1) is not a valid polynomial
  */
 struct UnitOutput {
+  // true if the unit produces an output i.e. has inputs that have a signal flowing through
   bool has_output;
+
+  // true if the output is valid i.e. is a polynomial of the type we expect
   bool is_valid;
-  int power;
+
+  // the actual polynomial the current unit is outputting
+  std::vector<int> poly;
 };
 
 typedef std::vector<UnitOutput> unit_outputs_t;
