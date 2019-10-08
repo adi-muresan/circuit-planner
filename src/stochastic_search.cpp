@@ -4,6 +4,7 @@
 #include <limits>
 #include <algorithm>
 #include <deque>
+#include <cmath>
 
 using namespace std;
 
@@ -78,8 +79,52 @@ UnitOutput comput_one_unit_output(int unit_type, UnitOutput const & in1, UnitOut
     }
   }
 
+  // check for negative powers
+  if(poly.back() <= 0) {
+    return {true, false, {}};
+  }
 
   return {true, true, poly};
+}
+
+/* Estimate a "distance" between a target polynomial and a candidate.
+ * This distance is not symmetrical since our goal is to recover the target.
+ * The distance is always positive or zero.
+ *
+ * A distance close to 0 means the candidate is close to the target.
+ *
+ * One way to compute the distance is for each term in the target find the
+ * closest term in the candidate and use their distance.
+ *
+ * We also must account for the difference in number of terms in the two polynomials.
+ */
+double compute_poly_distance(vector<int> const & target, vector<int> const & candidate) {
+  if(candidate.empty()) {
+    // infinite distance for nonexistent candidate
+    return numeric_limits<double>::max();
+  }
+
+  double distance = 0;
+
+  int best_match_id = 0;
+  for(int p : target) {
+    // find closest power in the candidate
+    int pow_dist = abs(p - candidate[best_match_id]);
+
+    while(best_match_id + 1 < candidate.size()
+          && pow_dist > abs(p - candidate[best_match_id + 1])) {
+      ++ best_match_id;
+      pow_dist = abs(p - candidate[best_match_id]);
+    }
+
+    // TODO: there's a hidden hyperparameter here to represent the tradeoff / conversion
+    distance += pow_dist;
+  }
+
+  // TODO: there's a hidden hyperparameter here
+  distance += abs(target.size() - candidate.size());
+
+  return distance;
 }
 }
 
@@ -176,16 +221,42 @@ double StochasticSearch::compute_score(int walker_id) {
     score += 1.0 + count_both_inputs_connected * params.unit_both_inputs_factor;
   }
 
-  // penalize unit outputs that have a coefficient (ex: by adding x^2 and x^2 we get 2*x^2) or negative powers
+  // score distance between unit outputs and function terms
   auto unit_outputs = compute_unit_outputs(walker_id);
 
-  // score distance between unit outputs and function terms
+  vector<double> distances;
+  distances.reserve(unit_outputs.size());
 
-  // score all terms that were recovered
+  for(int uid = 0; uid < unit_outputs.size(); ++ uid) {
+    auto & uo = unit_outputs[uid];
+    if(uo.has_output && uo.is_valid) {
+      distances.push_back(compute_poly_distance(poly, uo.poly));
+    }
+  }
 
-  // extra score if the whole function is recovered (useful ?)
+  // take the top 3 closes distances and add them to the score
+  sort(distances.begin(), distances.end());
+
+  for(int did = 0; did < 3 && did < distances.size(); ++ did) {
+    // we actually want the opposite of the distance
+    // take exp(-distance) because we want this to be symetrically "spikey"
+    score += exp(-1.0 * distances[did]) * params.distance_factor;
+  }
+
+  // score all terms that were successfully recovered (still useful in light of the above ?)
+
+  // extra score if the whole function is recovered by a unit output
+  for(int uid = 0; uid < unit_outputs.size(); ++ uid) {
+    auto & uo = unit_outputs[uid];
+    if(uo.poly == poly) {
+      score += params.function_recovered_factor;
+      cout << "Recovered whole function at unit with id " << uid
+           << endl;
+    }
+  }
 
   // score speed prior i.e. all wire lengths
+  // TODO: implement
 
   return score;
 }

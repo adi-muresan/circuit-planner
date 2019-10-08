@@ -73,6 +73,7 @@ struct ScoringParams {
   double unit_both_inputs_factor;
   double term_recovered_factor;
   double function_recovered_factor;
+  double distance_factor;
   double speed_prior_factor;
 };
 
