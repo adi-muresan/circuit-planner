@@ -7,6 +7,10 @@ int main(int argc, char *argv[]) {
   ScoringParams params {
     1.0,
     1.0,
+    1.0,
+    0.2,
+    1.0,
+    1.0,
     1.0
   };
   vector<int> poly {3, 7};

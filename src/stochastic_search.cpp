@@ -28,8 +28,8 @@ void StochasticSearch::train(int iteration_count, int cycle_count, int clone_cou
 }
 
 void StochasticSearch::initialize_walkers(int walker_count) {
-  // initialize wire connections to false
-  connections_t empty_walker(CONN_INPUT_SIZE, vector<bool>(CONN_OUTPUT_SIZE, false));
+  // initialize wire connections to nil
+  connections_t empty_walker(CONN_INPUT_COUNT, -1);
 
   // make sure we can reuse the same object by eliminating previous state
   walkers.clear();
@@ -69,11 +69,40 @@ void StochasticSearch::perform_cycle(int iteration_id, int cycle_id, int clone_c
 double StochasticSearch::compute_score(int walker_id) {
   connections_t const & walker = walkers[walker_id];
 
+  double score = 0;
+
   // score having a wire connection from the input of the array
+  for(int input_id = 0; input_id < walker.size(); ++ input_id) {
+    if(walker[input_id] == ARRAY_INPUT_ID) {
+      score += params.input_recovered_factor;
+      break;
+    }
+  }
 
   // score having a wire connection to the output of the array
+  if(walker[ARRAY_OUTPUT_ID] != -1) {
+    score += params.output_recovered_factor;
+  }
 
   // score number of units that have both inputs connected
+  int count_one_input_connected = 0;
+  int count_both_inputs_connected = 0;
+  for(int input_id = 0; input_id < ARRAY_OUTPUT_ID; input_id += 2) {
+    if(walker[input_id] != -1) {
+      if(walker[input_id + 1] != -1) {
+        ++ count_both_inputs_connected;
+      } else {
+        ++ count_one_input_connected;
+      }
+    }
+  }
+  if(count_both_inputs_connected > 0) {
+    score += 1.0 + count_both_inputs_connected * params.unit_both_inputs_factor;
+  }
+
+  // penalize unit outputs that have a coefficient (ex: by adding x^2 and x^2 we get 2*x^2) or negative powers
+
+  // score distance between unit outputs and function terms
 
   // score all terms that were recovered
 
@@ -81,7 +110,14 @@ double StochasticSearch::compute_score(int walker_id) {
 
   // score speed prior i.e. all wire lengths
 
-  return 0;
+  return score;
+}
+
+unit_outputs_t StochasticSearch::compute_unit_outputs(int walker_id) {
+  // TODO: implement
+  unit_outputs_t outputs(CONN_UNITS_COUNT - 1, {false, false, 0});
+
+  return outputs;
 }
 
 void StochasticSearch::inject_noise() {

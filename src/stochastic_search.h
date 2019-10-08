@@ -7,6 +7,8 @@
 /* This represents the search space of possible wires and their connections.
  * Store wire connections as a 2D matrix of size 151 x 301:
  *
+ * - inputs for the same unit are consecutive and start at a multiple of 2
+ *
  * - 3 x 50 + 1 outputs representing the signal source of a wire
  * i.e. 3 unit types, one output each
  *
@@ -33,13 +35,34 @@
  * - connection_t[150] - the wire connecting the input of the array
  * - connection_t[i][300] - the connection to the output of the array
  */
-typedef std::vector<std::vector<bool>> connections_t;
 
-const std::size_t CONN_INPUT_SIZE = 3 * 50 + 1;
-const std::size_t CONN_OUTPUT_SIZE = 3 * 50 * 2 + 1;
+// TODO: revise the above
+typedef std::vector<int> connections_t;
+
+const std::size_t CONN_UNITS_COUNT = 3 * 50 + 1;
+const std::size_t CONN_INPUT_COUNT = 3 * 50 * 2 + 1;
+
+// last element represents the input of the physical array
+const std::size_t ARRAY_INPUT_ID = CONN_UNITS_COUNT - 1;
+
+const std::size_t ARRAY_OUTPUT_ID = CONN_INPUT_COUNT - 1;
+
+/* A unit can generate an output, but it does not have to be always valid.
+ * Ex: x^2 + x^2 = 2*x^2, which we do not want to propagate further
+ */
+struct UnitOutput {
+  bool has_output;
+  bool is_valid;
+  int power;
+};
+
+typedef std::vector<UnitOutput> unit_outputs_t;
 
 struct ScoringParams {
+  double input_recovered_factor;
+  double output_recovered_factor;
   double unit_single_input_penalty;
+  double unit_both_inputs_factor;
   double term_recovered_factor;
   double function_recovered_factor;
   double speed_prior_factor;
@@ -67,6 +90,10 @@ class StochasticSearch {
    *
    */
   double compute_score(int walker_id);
+
+  /* Implement graph traversal to compute what outputs each unit generates.
+   */
+  unit_outputs_t compute_unit_outputs(int walker_id);
 
   // injects random noise into walkers, disallowing cycles
   void inject_noise();
