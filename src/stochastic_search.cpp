@@ -126,6 +126,24 @@ double compute_poly_distance(vector<int> const & target, vector<int> const & can
 
   return distance;
 }
+
+/* Compute lengths of all the wires, accounting for wire reuse.
+ *
+ * The physical structure of the array is simple and allows a minium spanning
+ * wire for each type of connection. This is the length that we will compute.
+ *
+ * Computing the minimum wire lengths is fairly straightforward:
+ * - we compute a histogram of the rows and columns of the
+ *
+ * TODO: refine this ^
+ */
+int compute_wire_lengths(connections_t const & conns) {
+  int lens = 0;
+
+  // TODO: implement
+
+  return lens;
+}
 }
 
 StochasticSearch::StochasticSearch(const vector<int> &polynomial, int walker_count, ScoringParams params)
@@ -256,7 +274,8 @@ double StochasticSearch::compute_score(int walker_id) {
   }
 
   // score speed prior i.e. all wire lengths
-  // TODO: implement
+  double wire_lengths = compute_wire_lengths(walker);
+  score += params.speed_prior_factor * 1.0 / wire_lengths;
 
   return score;
 }
