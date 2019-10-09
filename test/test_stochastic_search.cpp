@@ -8,7 +8,6 @@ using namespace std;
 using namespace scoring;
 
 TEST_CASE("Can run stochastic search", "[stochastic_search]" ) {
-  // TODO: test all free functions of polynomial propagation and computation
   ScoringParams params {
     1.0,
     1.0,

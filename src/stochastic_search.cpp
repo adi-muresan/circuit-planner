@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <deque>
 #include <cmath>
+#include <iomanip>
 #include <cassert>
 
 using namespace std;
@@ -31,9 +32,22 @@ void StochasticSearch::train(int iteration_count, int cycle_count, int clone_cou
     cout << "Performing iteration [ " << iter_id + 1
          << " / " << iteration_count << " ]"
          << endl;
+
+    ScoreOutput best_score = {0, numeric_limits<double>::lowest()};
+
     for(int cycle_id = 0; cycle_id < cycle_count; ++ cycle_id) {
-      perform_cycle(iter_id, cycle_id, clone_count);
+      auto score_out = perform_cycle(iter_id, cycle_id, clone_count);
+      if(best_score.best_score < score_out.best_score) {
+        best_score = score_out;
+      }
     }
+
+    cout << "\tbest score this iteration: "
+         << setprecision(2)
+         << best_score.best_score << endl
+         << "\tfunction was recovered "
+         << best_score.times_function_recovered
+         << " times" << endl;
 
     // inject random noise into walkers
     double iter_fraction = (double) (iter_id + 1) / iteration_count;
@@ -51,12 +65,19 @@ void StochasticSearch::initialize_walkers(int walker_count) {
   walkers.resize(walker_count, empty_walker);
 }
 
-void StochasticSearch::perform_cycle(int iteration_id, int cycle_id, int clone_count) {
+ScoreOutput StochasticSearch::perform_cycle(int iteration_id, int cycle_id, int clone_count) {
   // first compute the scores of each walker
   vector<double> scores(walkers.size(), numeric_limits<double>::lowest());
+  ScoreOutput best{0, numeric_limits<double>::lowest()};
 
   for(int wid = 0; wid < walkers.size(); ++ wid) {
-    scores[wid] = compute_score(wid);
+    auto score_out = compute_score(wid);
+    scores[wid] = score_out.best_score;
+
+    if(best.best_score < scores[wid]) {
+      best.best_score = scores[wid];
+      best.times_function_recovered = score_out.times_function_recovered;
+    }
   }
 
   // now perform the cloning
@@ -78,9 +99,11 @@ void StochasticSearch::perform_cycle(int iteration_id, int cycle_id, int clone_c
       ++ clones_performed;
     }
   }
+
+  return best;
 }
 
-double StochasticSearch::compute_score(int walker_id) {
+ScoreOutput StochasticSearch::compute_score(int walker_id) {
   connections_t const & walker = walkers[walker_id];
 
   double score = 0;
@@ -134,12 +157,12 @@ double StochasticSearch::compute_score(int walker_id) {
   // score all terms that were successfully recovered (still useful in light of the above ?)
 
   // extra score if the whole function is recovered by a unit output
+  int times_recovered = 0;
   for(int uid = 0; uid < unit_outputs.size(); ++ uid) {
     auto & uo = unit_outputs[uid];
     if(uo.poly == poly) {
       score += params.function_recovered_factor;
-      cout << "Recovered whole function at unit with id " << uid
-           << endl;
+      ++ times_recovered;
     }
   }
 
@@ -147,7 +170,7 @@ double StochasticSearch::compute_score(int walker_id) {
   double wire_lengths = compute_wire_lengths(walker);
   score += params.speed_prior_factor * 1.0 / wire_lengths;
 
-  return score;
+  return {times_recovered, score};
 }
 
 unit_outputs_t StochasticSearch::compute_unit_outputs(connections_t const & conns) {

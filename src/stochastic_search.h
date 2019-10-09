@@ -14,6 +14,11 @@ struct NoiseParams {
   int retries_on_cycle;
 };
 
+struct ScoreOutput {
+  int times_function_recovered;
+  double best_score;
+};
+
 class StochasticSearch {
   // random engine
   std::mt19937 random_generator;
@@ -31,12 +36,12 @@ class StochasticSearch {
   std::vector<connections_t> walkers;
 
   void initialize_walkers(int walker_count);
-  void perform_cycle(int iteration_id, int cycle_id, int clone_count);
+  ScoreOutput perform_cycle(int iteration_id, int cycle_id, int clone_count);
 
   /* Implements the scoring metric that we use to drive the stochastic search.
    *
    */
-  double compute_score(int walker_id);
+  ScoreOutput compute_score(int walker_id);
 
   /* Implement graph traversal to compute what outputs each unit generates.
    */
