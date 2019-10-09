@@ -155,8 +155,8 @@ vector<vector<int>> compute_output_mapping_from_connections(connections_t const 
  *
  * Heuristic:
  * - add wire for any two points within a Manhattan distance of 1
- * - along Y store the first and last point for each column in the array
- * - for each of the found columns construct a line between the extremes of that column
+ * - find the longest "vertical" span
+ * - for each column construct a vertical line between with the span above
  * - connect all other points and point groups to the constructed line
  * - repeat for every column in Y, keeping the minimum length
  *
@@ -172,14 +172,15 @@ vector<vector<int>> compute_output_mapping_from_connections(connections_t const 
  * h: 202 (histogram along Y)
  *
  * step 1: unite the two 1-neighbors of the first column
+ * step 2: longest vertical span is from row 0 to row 3 i.e. a length of 3
  *
- * step 2-1: assume a vertical wire from first to last entry of the first column
- * step 2-2: connect remaining points in the third column to this line
- * step 2-3: resulting wire will have a length of 7
+ * step 3-1: assume a vertical wire with the above span on the first column
+ * step 3-2: connect remaining point groups in the third column to this line
+ * step 3-3: resulting wire will have a length of 7
  *
- * step 3-1: assume a vertical line from first to last entry of the third column
- * step 3-2: connect remaining points in the first column to this line
- * step 3-3: resulting wire will have a length of 5
+ * step 4-1: assume a vertical wire with the above span on the third column
+ * step 4-2: connect remaining point groups in the first column to this line
+ * step 4-3: resulting wire will have a length of 5
  *
  * step 4: return a minimum length of 5.
  *
