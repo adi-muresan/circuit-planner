@@ -161,14 +161,16 @@ ScoreOutput StochasticSearch::compute_score(int walker_id) {
   for(int uid = 0; uid < unit_outputs.size(); ++ uid) {
     auto & uo = unit_outputs[uid];
     if(uo.poly == poly) {
-      score += params.function_recovered_factor;
       ++ times_recovered;
     }
+  }
+  if(times_recovered > 0) {
+    score += params.function_recovered_factor;
   }
 
   // score speed prior i.e. all wire lengths
   double wire_lengths = compute_wire_lengths(walker);
-  score += params.speed_prior_factor * 1.0 / wire_lengths;
+  score += params.speed_prior_factor * 1.0 / (1.0 + wire_lengths);
 
   return {times_recovered, score};
 }

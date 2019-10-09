@@ -25,7 +25,7 @@ TEST_CASE("Can run stochastic search", "[stochastic_search]" ) {
     0.5,
     3
   };
-  vector<int> poly {3, 7};
+  poly_t poly {3, 7};
   StochasticSearch ss(poly, 10, params);
   ss.train(20, 30, 10, np);
 }
