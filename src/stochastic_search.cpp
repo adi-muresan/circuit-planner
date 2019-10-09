@@ -14,7 +14,8 @@ using namespace scoring;
 using namespace propagation;
 
 StochasticSearch::StochasticSearch(const vector<int> &polynomial, int walker_count, ScoringParams params)
-  : random_generator(random_device{}()),
+//  : random_generator(random_device{}()),
+  : random_generator(42), // TODO: uncomment above
     dist_walkers(0, walker_count - 1),
     dist_inputs(0, CONN_INPUT_COUNT - 1),
     params(params),
@@ -224,11 +225,11 @@ void StochasticSearch::inject_noise(double iter_fraction, const NoiseParams &noi
       noise_cfg.starting_inputs_change_fraction *
 
       // exponential decay the number of inputs we change
-      pow(1.0 - noise_cfg.inputs_change_decay, iter_fraction * 50);
+      pow(1.0 - noise_cfg.inputs_change_decay, iter_fraction * 10);
 
   // cap the minimum to make sure we always change at least a few inputs
-  fraction_to_change = min(fraction_to_change, noise_cfg.min_inputs_change_fraction);
-  int units_to_change = UNIT_COUNT * fraction_to_change;
+  fraction_to_change = max(fraction_to_change, noise_cfg.min_inputs_change_fraction);
+  int inputs_to_change = CONN_INPUT_COUNT * fraction_to_change;
 
   bernoulli_distribution change_valid_input(noise_cfg.probability_change_valid_input);
 
@@ -243,7 +244,7 @@ void StochasticSearch::inject_noise(double iter_fraction, const NoiseParams &noi
       }
     }
 
-    for(int cid = 0; cid < units_to_change; ++ cid) {
+    for(int cid = 0; cid < inputs_to_change; ++ cid) {
       int input_id = get_random_input_id();
       int upstream_unit_id = walker[input_id];
 

@@ -7,5 +7,6 @@
 using namespace std;
 using namespace scoring;
 
-TEST_CASE("Can compute score", "[scoring]" ) {
+TEST_CASE("Can propagate compute graph", "[propagation]" ) {
+
 }

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include <set>
 
 using namespace std;
 
@@ -99,20 +100,26 @@ bool propagation::had_upstream_conn(const connections_t &conns, int downstream_u
     return false;
   }
 
+  set<int> added;
   vector<int> queue;
   queue.push_back(downstream_unit_id);
+  added.insert(downstream_unit_id);
 
   // standard graph traversal
   while(!queue.empty()) {
     int current_unit_id = queue.back();
     queue.pop_back();
 
+    // add upstream connections when needed
     int upstream_unit_id1 = conns[current_unit_id * 2];
     if(upstream_unit_id1 != -1) {
       if(upstream_unit_id1 == upstream_unit_id) {
         return true;
       }
-      queue.push_back(upstream_unit_id1);
+      if(upstream_unit_id1 != ARRAY_INPUT_ID && added.count(upstream_unit_id1) == 0) {
+        queue.push_back(upstream_unit_id1);
+        added.insert(upstream_unit_id1);
+      }
     }
 
     int upstream_unit_id2 = conns[current_unit_id * 2 + 1];
@@ -120,7 +127,10 @@ bool propagation::had_upstream_conn(const connections_t &conns, int downstream_u
       if(upstream_unit_id2 == upstream_unit_id) {
         return true;
       }
-      queue.push_back(upstream_unit_id2);
+      if(upstream_unit_id2 != ARRAY_INPUT_ID && added.count(upstream_unit_id2) == 0) {
+        queue.push_back(upstream_unit_id2);
+        added.insert(upstream_unit_id2);
+      }
     }
   }
 
