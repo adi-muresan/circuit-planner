@@ -19,9 +19,16 @@ TEST_CASE("Can run stochastic search", "[stochastic_search]" ) {
     10.0,
     10.0
   };
+  NoiseParams np {
+    0.7,
+    0.05,
+    0.1,
+    0.5,
+    3
+  };
   vector<int> poly {3, 7};
   StochasticSearch ss(poly, 10, params);
-  ss.train(20, 30, 10);
+  ss.train(20, 30, 10, np);
 }
 
 // TODO: more tests

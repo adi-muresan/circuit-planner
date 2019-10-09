@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <deque>
 #include <cmath>
+#include <cassert>
 
 using namespace std;
 using namespace scoring;
@@ -15,6 +16,7 @@ using namespace propagation;
 StochasticSearch::StochasticSearch(const vector<int> &polynomial, int walker_count, ScoringParams params)
   : random_generator(random_device{}()),
     dist_walkers(0, walker_count - 1),
+    dist_inputs(0, CONN_INPUT_COUNT - 1),
     params(params),
     poly(polynomial) {
   initialize_walkers(walker_count);
@@ -23,7 +25,7 @@ StochasticSearch::StochasticSearch(const vector<int> &polynomial, int walker_cou
   sort_canonical(& poly);
 }
 
-void StochasticSearch::train(int iteration_count, int cycle_count, int clone_count) {
+void StochasticSearch::train(int iteration_count, int cycle_count, int clone_count, NoiseParams const & noise_cfg) {
   for(int iter_id = 0; iter_id < iteration_count; ++ iter_id) {
     cout << "Performing iteration [ " << iter_id + 1
          << " / " << iteration_count << " ]"
@@ -33,7 +35,8 @@ void StochasticSearch::train(int iteration_count, int cycle_count, int clone_cou
     }
 
     // inject random noise into walkers
-    inject_noise();
+    double iter_fraction = (double) (iter_id + 1) / iteration_count;
+    inject_noise(iter_fraction, noise_cfg);
   }
 }
 
@@ -106,7 +109,7 @@ double StochasticSearch::compute_score(int walker_id) {
   }
 
   // score distance between unit outputs and function terms
-  auto unit_outputs = compute_unit_outputs(walker_id);
+  auto unit_outputs = compute_unit_outputs(walker);
 
   vector<double> distances;
   distances.reserve(unit_outputs.size());
@@ -146,11 +149,8 @@ double StochasticSearch::compute_score(int walker_id) {
   return score;
 }
 
-unit_outputs_t StochasticSearch::compute_unit_outputs(int walker_id) {
+unit_outputs_t StochasticSearch::compute_unit_outputs(connections_t const & conns) {
   unit_outputs_t unit_outputs(CONN_UNIT_COUNT, {false, false, {}});
-
-  // shorthand
-  auto & walker = walkers[walker_id];
 
   /* Do a forward traversal starting from the array input and propagate its
    * signal to all connections. Then do the same for all units that have both
@@ -159,7 +159,7 @@ unit_outputs_t StochasticSearch::compute_unit_outputs(int walker_id) {
 
   // first construct a reverse mapping from unit_id to list of units it is connected to
   vector<vector<int>> outgoing_conns =
-    compute_output_mapping_from_connections(walker);
+    compute_output_mapping_from_connections(conns);
 
   // now do the propagation, starting from the input of the array because
   // it always outputs the polynomial "x"
@@ -175,8 +175,8 @@ unit_outputs_t StochasticSearch::compute_unit_outputs(int walker_id) {
 
     // compute output of current unit
     if(unit_id != ARRAY_INPUT_ID) {
-      int in_unit_id1 = walker[unit_id * 2];
-      int in_unit_id2 = walker[unit_id * 2 + 1];
+      int in_unit_id1 = conns[unit_id * 2];
+      int in_unit_id2 = conns[unit_id * 2 + 1];
       int unit_type = unit_id % 3;
       unit_outputs[unit_id] = comput_one_unit_output(
         unit_type,
@@ -188,8 +188,8 @@ unit_outputs_t StochasticSearch::compute_unit_outputs(int walker_id) {
     // propagate to its downstream units
     for(int downstream_unit_id : outgoing_conns[unit_id]) {
       // check if both inputs are connected and add it to the list to be processed
-      int down_unit_in_id1 = walker[downstream_unit_id * 2];
-      int down_unit_in_id2 = walker[downstream_unit_id * 2 + 1];
+      int down_unit_in_id1 = conns[downstream_unit_id * 2];
+      int down_unit_in_id2 = conns[downstream_unit_id * 2 + 1];
 
       // sanity check
       if(down_unit_in_id1 != unit_id && down_unit_in_id2 != unit_id) {
@@ -211,10 +211,82 @@ unit_outputs_t StochasticSearch::compute_unit_outputs(int walker_id) {
   return unit_outputs;
 }
 
-void StochasticSearch::inject_noise() {
-  // TODO: implement
+/* Inject some noise into all the random walkers.
+ * In general it's good to inject more noise in the beginning and less towards
+ * the end of training when we already have partial solutions.
+ *
+ * The noise is in the form of changing the input connections of a unit:
+ * - give higher chances to change an input that is not connected
+ * - only connect to units that have a valid output
+ */
+void StochasticSearch::inject_noise(double iter_fraction, const NoiseParams &noise_cfg) {
+  double fraction_to_change =
+      noise_cfg.starting_inputs_change_fraction *
+
+      // exponential decay the number of inputs we change
+      pow(1.0 - noise_cfg.inputs_change_decay, iter_fraction * 50);
+
+  // cap the minimum to make sure we always change at least a few inputs
+  fraction_to_change = min(fraction_to_change, noise_cfg.min_inputs_change_fraction);
+  int units_to_change = UNIT_COUNT * fraction_to_change;
+
+  bernoulli_distribution change_valid_input(noise_cfg.probability_change_valid_input);
+
+  for(auto & walker : walkers) {
+    auto unit_outputs = compute_unit_outputs(walker);
+
+    // compute units with valid outputs
+    vector<int> units_with_valid_outputs;
+    for(int unit_id = 0; unit_id < unit_outputs.size(); ++ unit_id) {
+      if(unit_outputs[unit_id].is_valid) {
+        units_with_valid_outputs.push_back(unit_id);
+      }
+    }
+
+    for(int cid = 0; cid < units_to_change; ++ cid) {
+      int input_id = get_random_input_id();
+      int upstream_unit_id = walker[input_id];
+
+      if(upstream_unit_id >= 0 && unit_outputs[upstream_unit_id].is_valid) {
+        // input is connected to a wire producing a valid signal
+        // sample the config Bernoulli distribution to see if we should change it
+        if(change_valid_input(random_generator)) {
+          try_connect(& walker, input_id, units_with_valid_outputs, noise_cfg.retries_on_cycle);
+        }
+      } else {
+        try_connect(& walker, input_id, units_with_valid_outputs, noise_cfg.retries_on_cycle);
+        // TODO: could look into updating the units_with_valid_outputs on the fly here
+      }
+    }
+  }
+}
+
+void StochasticSearch::try_connect(connections_t * conns, int input_id, const std::vector<int> &unit_ids, int retries_on_cycle) {
+  assert(unit_ids.size() > 0);
+
+  uniform_int_distribution<int> dist_units(0, unit_ids.size() - 1);
+  int tries = 0;
+  bool have_connected = false;
+  int unit_id = input_id / 2;
+
+  do {
+    int sampled_index = dist_units(random_generator);
+    int target_unit_id = unit_ids[sampled_index];
+
+    // connect only if this would not introduce a cycle
+    if(! had_upstream_conn(*conns, target_unit_id, unit_id)) {
+      conns->at(input_id) = target_unit_id;
+      have_connected = true;
+    }
+
+    ++ tries;
+  } while(tries < retries_on_cycle && ! have_connected);
 }
 
 int StochasticSearch::get_random_walker_id() {
   return dist_walkers(random_generator);
+}
+
+int StochasticSearch::get_random_input_id() {
+  return dist_inputs(random_generator);
 }

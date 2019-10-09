@@ -92,3 +92,37 @@ std::vector<std::vector<int> > propagation::compute_output_mapping_from_connecti
 
   return outgoing_conns;
 }
+
+bool propagation::had_upstream_conn(const connections_t &conns, int downstream_unit_id, int upstream_unit_id) {
+  // handle special case; the array input unit has no upstream units
+  if(downstream_unit_id == ARRAY_INPUT_ID) {
+    return false;
+  }
+
+  vector<int> queue;
+  queue.push_back(downstream_unit_id);
+
+  // standard graph traversal
+  while(!queue.empty()) {
+    int current_unit_id = queue.back();
+    queue.pop_back();
+
+    int upstream_unit_id1 = conns[current_unit_id * 2];
+    if(upstream_unit_id1 != -1) {
+      if(upstream_unit_id1 == upstream_unit_id) {
+        return true;
+      }
+      queue.push_back(upstream_unit_id1);
+    }
+
+    int upstream_unit_id2 = conns[current_unit_id * 2 + 1];
+    if(upstream_unit_id2 != -1) {
+      if(upstream_unit_id2 == upstream_unit_id) {
+        return true;
+      }
+      queue.push_back(upstream_unit_id2);
+    }
+  }
+
+  return false;
+}

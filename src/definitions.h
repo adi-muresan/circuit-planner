@@ -31,7 +31,7 @@
  * 49: AMD
  *
  * connection_t[i] - the unit connected to the input "i % 2" of unit at position
- * "i / 2" in the physical array to the inputs of any units
+ * ("(i / 2) / 3", "(i / 2) % 3") in the physical array to the inputs of any units
  */
 typedef std::vector<int> connections_t;
 
@@ -42,7 +42,7 @@ const std::size_t CONN_UNIT_COUNT = UNIT_COUNT + 1;
 const std::size_t CONN_INPUT_COUNT = 3 * 50 * 2;
 
 // last element represents the input of the physical array
-const std::size_t ARRAY_INPUT_ID = UNIT_COUNT - 1;
+const std::size_t ARRAY_INPUT_ID = CONN_UNIT_COUNT - 1;
 
 /* A unit can generate an output, but it does not have to be always valid.
  * Ex: x^2 + x^2 = 2*x^2, which we do not want to propagate further
