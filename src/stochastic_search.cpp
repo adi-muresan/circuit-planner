@@ -1,10 +1,12 @@
 #include "stochastic_search.h"
+#include "utils/disjoint_sets.h"
 
 #include <iostream>
 #include <limits>
 #include <algorithm>
 #include <deque>
 #include <cmath>
+#include <set>
 
 using namespace std;
 
@@ -127,23 +129,169 @@ double compute_poly_distance(vector<int> const & target, vector<int> const & can
   return distance;
 }
 
+/* Compute a mapping from unit output to the units it connects to
+ */
+vector<vector<int>> compute_output_mapping_from_connections(connections_t const & conn) {
+  vector<vector<int>> outgoing_conns(CONN_UNIT_COUNT);
+
+  for(int uw_id = 0; uw_id < conn.size(); ++ uw_id) {
+    int in_unit_id = conn[uw_id];
+    if(in_unit_id != -1) {
+      int unit_id = uw_id / 2;
+      outgoing_conns[in_unit_id].push_back(unit_id);
+    }
+  }
+
+  return outgoing_conns;
+}
+
 /* Compute lengths of all the wires, accounting for wire reuse.
  *
  * The physical structure of the array is simple and allows a minium spanning
- * wire for each type of connection. This is the length that we will compute.
+ * wire for each type of connection. Computing the minimum spanning length is
+ * not straightforward, which is why we will use a heuristic to approximate it.
+ * Since the array is a lot longer along the Y direction, there will be longer
+ * lines forming in this direction.
  *
- * Computing the minimum wire lengths is fairly straightforward:
- * - we compute a histogram of the rows and columns of the
+ * Heuristic:
+ * - add wire for any two points within a Manhattan distance of 1
+ * - along Y store the first and last point for each column in the array
+ * - for each of the found columns construct a line between the extremes of that column
+ * - connect all other points and point groups to the constructed line
+ * - repeat for every column in Y, keeping the minimum length
  *
- * TODO: refine this ^
+ * Example:
+ *
+ *    012
+ *    ---
+ * 0: 001
+ * 1: 100
+ * 2: 100
+ * 3: 001
+ *
+ * h: 202 (histogram along Y)
+ *
+ * step 1: unite the two 1-neighbors of the first column
+ *
+ * step 2-1: assume a vertical wire from first to last entry of the first column
+ * step 2-2: connect remaining points in the third column to this line
+ * step 2-3: resulting wire will have a length of 7
+ *
+ * step 3-1: assume a vertical line from first to last entry of the third column
+ * step 3-2: connect remaining points in the first column to this line
+ * step 3-3: resulting wire will have a length of 5
+ *
+ * step 4: return a minimum length of 5.
+ *
+ *
+ * Note: the current heuristic overestimates wire lengths i.e. there is no guarantee
+ * that the solution here will be minimal wrt. spanning wire length.
+ *
+ * TODO: Find a better way of computing minimum wire lengths
  */
+int compute_one_wire_length(vector<int> const & wire); // forward declaration
 int compute_wire_lengths(connections_t const & conns) {
   int lens = 0;
 
-  // TODO: implement
+  // we need to compute the lengths for each individual wire i.e. unit output
+  vector<vector<int>> outgoing_conns =
+    compute_output_mapping_from_connections(conns);
+
+  // we need to consider each wire individually
+  for(int unit_id = 0; unit_id < UNIT_COUNT; ++ unit_id) {
+    auto & out_conns = outgoing_conns[unit_id];
+    if(! out_conns.empty()) {
+      // make a copy and store all points of the wire, including source
+      vector<int> wire(outgoing_conns[unit_id]);
+      wire.push_back(unit_id);
+
+      lens += compute_one_wire_length(wire);
+    }
+  }
 
   return lens;
 }
+
+// Implement logic described above for one wire
+int compute_one_wire_length(vector<int> const & wire) {
+  int row_low = numeric_limits<int>::max();
+  int row_high = numeric_limits<int>::lowest();
+
+  // find longest vertical strip
+  for(int unit_id : wire) {
+    int unit_row = unit_id / UNIT_COLL_COUNT;
+
+    row_low = min(row_low, unit_row);
+    row_high = max(row_high, unit_row);
+  }
+
+  // store each unit in its distinct group that we unify as we go along
+  utils::disj_sets groups(wire.size());
+
+  // unify all units within a distance of 1
+  for(int i = 0; i < wire.size() - 1; ++ i) {
+    int row1 = wire[i] / UNIT_COLL_COUNT;
+    int col1 = wire[i] % UNIT_COLL_COUNT;
+    for(int j = i + 1; j < wire.size(); ++ j) {
+      int row2 = wire[j] / UNIT_COLL_COUNT;
+      int col2 = wire[j] % UNIT_COLL_COUNT;
+
+      if(abs(row1 - row2) + abs(col1 - col2) == 1) {
+        groups.merge(i, j);
+      }
+    }
+  }
+
+  // store overall wire length estimation
+  int len = 0;
+
+  // create a vertical wire as the backbone
+  len += row_high - row_low;
+
+  // assume a vertical line through each column and get the minimum spanning wire
+  int min_dist = numeric_limits<int>::max();
+  for(int coll_id = 0; coll_id < UNIT_COLL_COUNT; ++ coll_id) {
+    int coll_dist = 0;
+
+    // store minimum distance from a group of 1-connected units to the vertical wire
+    vector<int> group_distance(wire.size(), numeric_limits<int>::max());
+
+    for(int wid = 0; wid < wire.size(); ++ wid) {
+      int unit_id = wire[wid];
+      // compute distance from current unit to the vertical wire
+      int unit_coll = unit_id % UNIT_COLL_COUNT;
+
+      int group_id = groups.get_representative(wid);
+      group_distance[group_id] = min(group_distance[group_id], abs(unit_coll - coll_id));
+    }
+
+    // go through all groups and accumulate minimum distances
+    for(int wid = 0; wid < wire.size(); ++ wid) {
+      int group_id = groups.get_representative(wid);
+      if(group_distance[group_id] > 0) { // current unit group is not 1-coonected to the vertical wire
+        if(group_id == wid) {
+          /* This is the "leader" of the current group.
+           * It has no special meaning, but we can use it to avoid connecting
+           * the group twice to the vertical wire since the leader is unique
+           */
+          coll_dist += group_distance[group_id];
+        } else {
+          /* This is a unit that is 1-connected to the vertical wire.
+           * Now we add its connection
+           */
+          coll_dist += 1;
+        }
+      }
+    }
+
+    // update minimum spanning distance
+    min_dist = min(min_dist, coll_dist);
+  }
+
+  return len;
+}
+
+// TODO: refactor the above in separate files
 }
 
 StochasticSearch::StochasticSearch(const vector<int> &polynomial, int walker_count, ScoringParams params)
@@ -292,15 +440,8 @@ unit_outputs_t StochasticSearch::compute_unit_outputs(int walker_id) {
    */
 
   // first construct a reverse mapping from unit_id to list of units it is connected to
-  vector<vector<int>> outgoing_conns(CONN_UNIT_COUNT);
-
-  for(int uw_id = 0; uw_id < walker.size(); ++ uw_id) {
-    int in_unit_id = walker[uw_id];
-    if(in_unit_id != -1) {
-      int unit_id = uw_id / 2;
-      outgoing_conns[in_unit_id].push_back(unit_id);
-    }
-  }
+  vector<vector<int>> outgoing_conns =
+    compute_output_mapping_from_connections(walker);
 
   // now do the propagation, starting from the input of the array because
   // it always outputs the polynomial "x"

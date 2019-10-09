@@ -42,7 +42,9 @@
 // TODO: revise the above
 typedef std::vector<int> connections_t;
 
-const std::size_t UNIT_COUNT = 3 * 50;
+const std::size_t UNIT_ROW_COUNT = 50;
+const std::size_t UNIT_COLL_COUNT = 3;
+const std::size_t UNIT_COUNT = UNIT_ROW_COUNT * UNIT_COLL_COUNT;
 const std::size_t CONN_UNIT_COUNT = UNIT_COUNT + 1;
 const std::size_t CONN_INPUT_COUNT = 3 * 50 * 2;
 
