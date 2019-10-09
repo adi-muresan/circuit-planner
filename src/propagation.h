@@ -11,7 +11,7 @@ void sort_canonical(std::vector<int> * p);
 /* Computes the output of a unit given its inputs that can be polynomials or invalid.
  * unit_type can be 0 (adder), 1 (multiplier) or 2 (divider)
  */
-UnitOutput comput_one_unit_output(int unit_type, UnitOutput const & in1, UnitOutput const & in2);
+UnitOutput compute_one_unit_output(int unit_type, UnitOutput const & in1, UnitOutput const & in2);
 
 /* Compute a mapping from unit output to the units it connects to
  */
@@ -21,7 +21,7 @@ std::vector<std::vector<int>> compute_output_mapping_from_connections(connection
  * a connection from the unit with input input_id to unit_id i.e.
  * adding unit_id as a downstream connection from input_id would create a cycle.
  */
-bool had_upstream_conn(const connections_t &conns, int downstream_unit_id, int upstream_unit_id);
+bool has_upstream_conn(const connections_t &conns, int downstream_unit_id, int upstream_unit_id);
 
 }
 

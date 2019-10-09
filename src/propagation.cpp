@@ -10,7 +10,7 @@ void propagation::sort_canonical(std::vector<int> *p) {
   sort(p->begin(), p->end(), std::greater<int>());
 }
 
-UnitOutput propagation::comput_one_unit_output(int unit_type, const UnitOutput &in1, const UnitOutput &in2) {
+UnitOutput propagation::compute_one_unit_output(int unit_type, const UnitOutput &in1, const UnitOutput &in2) {
   if(! in1.has_output || ! in2.has_output) {
     // if an input does not have a signal flowing through it then do not propagate
     // this should never happen btw
@@ -38,7 +38,7 @@ UnitOutput propagation::comput_one_unit_output(int unit_type, const UnitOutput &
     poly.reserve(in1.poly.size() + in2.poly.size());
     for(int p1 : in1.poly) {
       for(int p2 : in2.poly) {
-        poly.push_back(p1 * p2);
+        poly.push_back(p1 + p2);
       }
     }
     break;
@@ -94,7 +94,7 @@ std::vector<std::vector<int> > propagation::compute_output_mapping_from_connecti
   return outgoing_conns;
 }
 
-bool propagation::had_upstream_conn(const connections_t &conns, int downstream_unit_id, int upstream_unit_id) {
+bool propagation::has_upstream_conn(const connections_t &conns, int downstream_unit_id, int upstream_unit_id) {
   // handle special case; the array input unit has no upstream units
   if(downstream_unit_id == ARRAY_INPUT_ID) {
     return false;

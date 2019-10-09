@@ -14,8 +14,8 @@ using namespace scoring;
 using namespace propagation;
 
 StochasticSearch::StochasticSearch(const vector<int> &polynomial, int walker_count, ScoringParams params)
-//  : random_generator(random_device{}()),
-  : random_generator(42), // TODO: uncomment above
+  : random_generator(random_device{}()),
+//  : random_generator(42), // for reproducible debugging
     dist_walkers(0, walker_count - 1),
     dist_inputs(0, CONN_INPUT_COUNT - 1),
     params(params),
@@ -179,7 +179,7 @@ unit_outputs_t StochasticSearch::compute_unit_outputs(connections_t const & conn
       int in_unit_id1 = conns[unit_id * 2];
       int in_unit_id2 = conns[unit_id * 2 + 1];
       int unit_type = unit_id % 3;
-      unit_outputs[unit_id] = comput_one_unit_output(
+      unit_outputs[unit_id] = compute_one_unit_output(
         unit_type,
         unit_outputs[in_unit_id1],
         unit_outputs[in_unit_id2]
@@ -275,7 +275,7 @@ void StochasticSearch::try_connect(connections_t * conns, int input_id, const st
     int target_unit_id = unit_ids[sampled_index];
 
     // connect only if this would not introduce a cycle
-    if(! had_upstream_conn(*conns, target_unit_id, unit_id)) {
+    if(! has_upstream_conn(*conns, target_unit_id, unit_id)) {
       conns->at(input_id) = target_unit_id;
       have_connected = true;
     }
