@@ -44,6 +44,8 @@ const std::size_t CONN_INPUT_COUNT = 3 * 50 * 2;
 // last element represents the input of the physical array
 const std::size_t ARRAY_INPUT_ID = CONN_UNIT_COUNT - 1;
 
+typedef std::vector<int> poly_t;
+
 /* A unit can generate an output, but it does not have to be always valid.
  * Ex: x^2 + x^2 = 2*x^2, which we do not want to propagate further
  * Ex: x / (x + 1) is not a valid polynomial

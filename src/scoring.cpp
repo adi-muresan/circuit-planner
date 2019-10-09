@@ -135,5 +135,7 @@ int scoring::compute_one_wire_length(const vector<int> &wire) {
     min_dist = min(min_dist, coll_dist);
   }
 
+  len += min_dist;
+
   return len;
 }

@@ -64,9 +64,9 @@ double compute_poly_distance(std::vector<int> const & target, std::vector<int> c
  *
  * step 4-1: assume a vertical wire with the above span on the third column
  * step 4-2: connect remaining point groups in the first column to this line
- * step 4-3: resulting wire will have a length of 5
+ * step 4-3: resulting wire will have a length of 6
  *
- * step 4: return a minimum length of 5.
+ * step 4: return a minimum length of 6.
  *
  *
  * Note: the current heuristic overestimates wire lengths i.e. there is no guarantee
