@@ -72,7 +72,10 @@ double compute_poly_distance(std::vector<int> const & target, std::vector<int> c
  * Note: the current heuristic overestimates wire lengths i.e. there is no guarantee
  * that the solution here will be minimal wrt. spanning wire length.
  *
- * TODO: Find a better way of computing minimum wire lengths
+ * TODO: Find a better way of computing minimum wire lengths.
+ *
+ * TODO: Account for wire length from the input of the array to the first
+ * unit and from the last unit to the output of the array.
  */
 int compute_wire_lengths(connections_t const & conns);
 

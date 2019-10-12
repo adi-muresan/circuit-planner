@@ -61,6 +61,12 @@ int scoring::compute_wire_lengths(const connections_t &conns) {
 }
 
 int scoring::compute_one_wire_length(const vector<int> &wire) {
+  /* Note that currently we don't account for wire lengths from the input
+   * of the array to the first unit and from the last unit to the output.
+   *
+   * This should not change the results qualitatively, but should still be
+   * improved.
+   */
   int row_low = numeric_limits<int>::max();
   int row_high = numeric_limits<int>::lowest();
 
